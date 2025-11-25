@@ -1,0 +1,472 @@
+---
+title: "tubes"
+author: "M. Akbar Resdika"
+date: "2024-05-12"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+# Import Packages
+
+```{r}
+library(gstat)
+library(sp)
+library(ggplot2)
+library(geos)
+library(readxl)
+```
+
+# Exploratory Data Analysis
+
+## Load Data, View Data & Statistics
+
+```{r}
+df_sample  <- read.csv("C:/Akbar/adsp/tubes/tabel/Data_Dem_UluTimur_sample1000obs.csv")
+head(df_sample)
+```
+
+```{r}
+summary(df_sample)
+```
+
+```{r}
+quantile(dist(df_sample[,1:2])) #jarak anta titik
+```
+
+## Histogram
+
+```{r}
+ggplot(df_sample, aes (elevasi)) +
+  geom_histogram(aes(), bins = 10, col=1, fill=3, alpha=.5) +
+  labs (x="Elevasi",y="Count", title = "Histogram", subtitle="Raw Data") +
+  theme (plot.title = element_text(face = "bold", size = 20,hjust =0.5, color = "black")) +
+  theme (axis.text = element_text(colour = "black", size =10, face = "bold")) +
+  theme (plot.subtitle=element_text(size=12, hjust=0.5, face="italic", color="black"))
+```
+
+## Density Curve
+
+```{r}
+ggplot(df_sample, aes (elevasi)) +
+  geom_vline (aes (xintercept = mean (elevasi), color="Mean"), linetype="dashed",
+  size=1) +
+  geom_vline (aes (xintercept = median (elevasi), color="Median"), linetype="dashed",
+  size=1)+
+  geom_density(col=1, alpha=.2, fill=3) +
+  labs (x= 'Elevasi Ketinggian Wilayah(mdpl)', y='Density')+
+  scale_color_manual (name = "Statistics", values = c(Median = "blue",
+  Mean = "red"))+
+  labs (x="Elevasi (M)",y="Density", title = "Density curve",
+  subtitle="Raw Data, Mean, Median") +
+  theme (plot.title = element_text(face = "bold", size = 20,hjust =0.5, color = "black")) +
+  theme (axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme (plot.subtitle=element_text(size=12, hjust=0.5, face="italic", color="black"))
+```
+
+## Normal Q-Q Plot
+
+```{r}
+ggplot(data=df_sample, aes(sample=elevasi))+ stat_qq_line(col="red", size=1.2)+ stat_qq()+
+  labs (x="Theoretical",y="Sample", title = "Normal Q-Q Plot",
+  subtitle="Raw Data") +
+  theme (plot.title = element_text(face = "bold", size = 20,hjust =0.5, color = "black")) +
+  theme (axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme (plot.subtitle=element_text(size=12, hjust=0.5, face="italic", color="black"))
+```
+
+## Bubble Map
+
+**Identify the trend**
+
+```{r}
+ggplot (df_sample,aes (x,y)) + geom_point(aes(size=elevasi), color=3, alpha=.8) +
+  labs (X="Easting",Y="Northing", title = "Elevasi") +
+  theme ( plot.title = element_text(face = "bold", size = 20,hjust =0.5,
+  color = "black")) +
+  theme (axis.text = element_text(colour = "black", size =10, face = "bold"))
+```
+
+## Trend Analysis
+
+```{r}
+# trend analysis x Easting, lineal, second & third order
+
+ggplot(df_sample,aes(x,elevasi)) + 
+  geom_smooth(method = "lm", formula= y~x,se=F,size=1.2, aes(colour="Linear")) + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = F, size=1.2,
+  aes(colour="Second_Order")) + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 3), se = F, size=1.2,
+  aes(colour="Third_Order")) +
+  scale_color_manual(name = "Regresion Type", values = c(Linear = "red", 
+  Second_Order = "blue", Third_Order = "green4"))+
+  labs(X="Easting",Y="Elevasi", title = "Scatter Plot", 
+  subtitle="Elevasi vs X") + geom_point() +
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+  color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold")) +
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+  color="black")) 
+```
+
+```{r}
+# trend analysis y Northing, lineal, second & third order
+
+ggplot(df_sample,aes(y,elevasi)) + 
+  geom_smooth(method = "lm", formula= y~x,se=F,size=1.2, aes(colour="Linear")) + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = F, size=1.2,
+  aes(colour="Second_Order")) + 
+  geom_smooth(method = "lm", formula = y ~ poly(x, 3), se = F, size=1.2,
+  aes(colour="Third_Order")) +
+  scale_color_manual(name = "Regresion Type", values = c(Linear = "red", 
+  Second_Order = "blue", Third_Order = "green4"))+
+  labs(x="Northing",y="Elevasi", title = "Scatter Plot", 
+  subtitle="elevasi vs y") + geom_point() +
+  theme(plot.title = element_text(face = "bold", 
+  size = 20,hjust =0.5, color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold")) +
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+  color="black"))
+```
+
+# Experimental Semivariogram (Svgm)
+
+## Semivariogram Cloud
+
+```{r}
+A = df_sample
+Adf = A
+coordinates(A) <- ~x+y
+```
+
+```{r}
+vgm_cloud = (variogram(elevasi~1, A, cutoff =150000, cloud=T ))
+write.table(vgm_cloud, 
+            file="C:/Akbar/adsp/tubes/tabel/cloud_points.xls", sep=",")
+```
+
+```{r}
+View(vgm_cloud)
+```
+
+```{r}
+ggplot(vgm_cloud,aes(x=dist,gamma)) + geom_point(colour = "blue", size = 1) +
+  labs(x="Distance [m]",y="Gamma", title = "Semivariogram", 
+  subtitle="Raw Data - semivariogram Cloud") + 
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+  color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+  color="black"))
+```
+
+## Semivariogram Omnidirectional
+
+```{r}
+g = gstat(id='elevasi', formula=elevasi~1,data = A) #gstat object
+vgm1 = variogram(g) #trend is obvious
+head(vgm1) #data for the first six 
+vgm1       #data for all 
+plot(vgm1) # distance/3
+```
+
+```{r}
+# we can increase the cutoff distance to have at least the the half of max dist:
+vgm1 = variogram(g, cutoff=100000, width=1000)
+vgm1 #see how lag changes as we change the width 
+plot(vgm1) 
+```
+
+```{r}
+View (vgm1)
+```
+
+```{r}
+pair_count = ggplot(data = vgm1) +
+  geom_col(mapping = aes(x = dist, y = np), width = 0.01, color = "blue") +
+  labs(x="Distance [m]",y="Number of Points") + 
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+  color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+  color="black")) +
+  geom_hline(aes(yintercept = var(Adf$elevasi), color="Variance"), linetype="dashed",
+  size=1) +
+  scale_color_manual(name = "Statistics", values = c(Variance = "red"))
+plot(pair_count) 
+```
+
+```{r}
+#with ggplot plus the variance line
+
+Semivario1= ggplot(vgm1,aes(x=dist,gamma)) + geom_point(colour = "blue", size = 1) +
+  labs(x="Distance [m]",y="Gamma", title = "Semivariogram", 
+  subtitle="Raw Data - Omnidirectional Semivariogram") + 
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+  color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+  color="black")) +
+  geom_hline(aes(yintercept = var(Adf$elevasi), color="Variance"), linetype="dashed",
+  size=1) +
+  scale_color_manual(name = "Statistics", values = c(Variance = "red"))
+plot(Semivario1)
+```
+
+## Linear Regression
+
+```{r}
+attach(Adf)
+plot(x, elevasi, main="Elevasi VS X coordinates")
+```
+
+```{r}
+attach(Adf)
+plot(y, elevasi, main="Elevasi VS Y coordinates")
+```
+
+```{r}
+#pearson''s correlation
+cor.test(elevasi,x) #p-value < 0.05 refuse null hypothesis. There is lineal relation
+#negative correlation, high lineal correlation -0.7457751 (-1 max, 0 min) 
+```
+
+```{r}
+cor.test(elevasi,y)
+```
+
+```{r}
+modellx=lm(elevasi~x)
+plot(x,elevasi, main="Elevasi VS X coordinates")
+abline(modellx)
+```
+
+```{r}
+residualsx =residuals(modellx)
+head(residualsx)
+```
+
+```{r}
+plot(modellx)
+```
+
+```{r}
+modelly=lm(elevasi~y)
+plot(y,elevasi, main="Elevasi VS Y coordinates")
+abline(modelly)
+```
+
+```{r}
+residualsy =residuals(modelly)
+head(residualsy)
+```
+
+```{r}
+plot(modelly)
+```
+
+```{r}
+hist(residualsy)
+```
+
+## Semivariogram Residuals
+
+### Semivariogram Residual Cloud
+
+```{r}
+# Cloud of residuals with ggplot
+vgm_residual_cloud = (variogram(elevasi~x+y,A,cutoff=100000, cloud=T))
+ggplot(vgm_residual_cloud,aes(x=dist,gamma)) + 
+  geom_point(colour = "blue", size = 1) +
+  labs(x="Distance [m]",y="Gamma", title = "Semivariogram", 
+       subtitle="Raw Data - semivariogram Residual Cloud") + 
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+                                   color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+                                   color="black"))
+```
+
+```{r}
+#Variance on Residuals to add to the graph
+
+model_1 = lm(elevasi~x+y, data=Adf)
+Adf$predicted_1 = predict(model_1)
+Adf$residuals_1 = residuals(model_1)
+
+var(Adf$residuals_1)
+```
+
+### Semivariogram Omnidirectional residuals
+
+```{r}
+g_trend = gstat(id='elevasi', formula=elevasi~x+y,data = A) #gstat object
+
+vgm_Residuals = variogram(g_trend, cutoff=100000, width=1000)
+```
+
+```{r}
+ggplot(vgm_Residuals,aes(x=dist,gamma)) + geom_point(colour = "blue", size = 1) +
+  labs(x="Distance [m]",y="Gamma", title = "Semivariogram", 
+       subtitle="Raw Data - Omnidirectional Semivariogram of Residuals") + 
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+                                   color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+                                   color="black")) +
+  geom_hline(aes(yintercept = var(Adf$residuals_1), color="Variance"), linetype="dashed",
+             size=1) +
+  scale_color_manual(name = "Statistics", values = c(Variance = "red")) 
+```
+
+# Model Semivariogram
+
+```{r}
+#"Exp" (An exponential model)
+#"Sph" (A spherical model)
+#"Gau" (A gaussian model)
+```
+
+```{r}
+g_trend = gstat(id='elevasi', formula=elevasi~x+y,data = A) #gstat object
+
+model_residual = variogram(g_trend, cutoff=25000, width=1000)
+```
+
+### Spherical Model
+
+```{r}
+# Spherical
+vgm_residual.fit_sph = fit.variogram(model_residual, 
+                                     model = vgm(0.5,"Sph",3000,0.5)) 
+vgm_residual.fit_sph
+```
+
+### Exponential Model
+
+```{r}
+# Exponential
+vgm_residual.fit_exp = fit.variogram(model_residual, 
+                                     model = vgm(0.5,"Exp",3000,0.5)) 
+vgm_residual.fit_exp
+```
+
+### Gaussian Model
+
+```{r}
+# Gaussian
+vgm_residual.fit_gau = fit.variogram(model_residual, 
+                                     model = vgm(0.5,"Gau",3000,0.5))
+vgm_residual.fit_gau
+```
+
+### 
+
+```{r}
+fit.variogram(model_residual, vgm(c("Exp", "Sph", "Gau")))
+```
+
+```{r}
+# to plot the semivariogran model with ggplot, we need the variogram line model
+
+model_sph = variogramLine(vgm_residual.fit_sph, maxdist = max(model_residual$dist))
+head(model_sph)
+
+model_exp = variogramLine(vgm_residual.fit_exp, maxdist = max(model_residual$dist))
+head(model_exp)
+
+model_gau = variogramLine(vgm_residual.fit_gau, maxdist = max(model_residual$dist))
+head(model_gau)
+```
+
+```{r}
+#plot with ggplot
+
+ggplot(model_residual, aes(x = dist, y = gamma)) +
+  geom_point(size=2) +
+  geom_line(data = model_sph, linetype="solid", aes(color= "Spherical"), size=0.8)+
+  geom_line(data = model_exp, linetype="dashed", aes(color= "Exponential"), size=0.8)+
+  geom_line(data = model_gau, linetype="twodash", aes(color= "Gaussian"), size=0.8)+
+  labs(x="Distance [m]",y="Gamma", title = "Model Semivariogram ", 
+       subtitle="Fitted  Model Omnidirectional Residual Semivariogram",
+       col="Model",shape='')+
+  theme(plot.title = element_text( face = "bold",size = 20,hjust =0.5, 
+                                   color = "black")) + 
+  theme(axis.text = element_text(colour = "black", size =10, face = "bold"))+
+  theme(plot.subtitle=element_text(size=12, hjust=0.5, face="italic", 
+  color="black") + scale_color_manual(name = "Theoretical Model", 
+ values = c(Spherical= "blue", Exponential= "Red",Gaussian="green" )))
+```
+
+# Cross Validation
+
+## cross validation spherical omnidirectional
+
+```{r}
+cross_validation_sph = 
+  krige.cv(elevasi ~ x+y, locations = A, model = vgm_residual.fit_sph)
+summary(cross_validation_sph$residual)
+class(cross_validation_sph)
+```
+
+```{r}
+summary(cross_validation_sph)
+```
+
+## cross validation exponential omnidirectional
+
+```{r}
+# cross validation exponential omnidirectional
+cross_validation_exp = 
+  krige.cv(elevasi ~ x+y, locations = A, model = vgm_residual.fit_exp)
+summary(cross_validation_exp$residual)
+class(cross_validation_exp)
+```
+
+```{r}
+summary(cross_validation_exp)
+```
+
+## cross validation gaussian omnidirectional
+
+```{r}
+# cross validation exponential omnidirectional
+cross_validation_gau = 
+  krige.cv(elevasi ~ x+y, locations = A, model = vgm_residual.fit_gau)
+summary(cross_validation_gau$residual)
+class(cross_validation_gau)
+```
+
+```{r}
+summary(cross_validation_gau)
+```
+
+## Root-Mean-Square Error (RMSE)
+
+### RMSE Spherical
+
+```{r}
+(UK.RMSE_sph=
+    sqrt(sum(cross_validation_sph$residual^2)/
+           (length(cross_validation_sph$residual))))
+
+```
+
+### RMSE Exponential
+
+```{r}
+(UK.RMSE_exp=
+    sqrt(sum(cross_validation_exp$residual^2)/
+           (length(cross_validation_exp$residual))))
+```
+
+### RMSE Gaussian
+
+```{r}
+(UK.RMSE_gau=
+    sqrt(sum(cross_validation_gau$residual^2)/
+           (length(cross_validation_gau$residual))))
+```
+
+Model terbaik adalah Gaussian karena memiliki nilai RMSE yang paling kecil
